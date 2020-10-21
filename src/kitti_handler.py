@@ -100,7 +100,7 @@ def load_kitti_stereo(imgR_pth, imgL_pth, calib):
     # points_3D = reprojectImageTo3D(Q, parallax_map)
 
     mask_map_zero = disparity > disparity.min()
-    print('points_3D', points_3D)
+    # print('points_3D', points_3D)
     mask_map_z = points_3D[:, :, 2] < 50
     mask_map = mask_map_zero & mask_map_z
 
