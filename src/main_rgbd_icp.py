@@ -37,8 +37,11 @@ def color_icp(source, target, trans_init, down_sample=False):
             source_down = source
             target_down = target
 
-        source_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=30))
-        target_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=30))
+        o3d.geometry.estimate_normals(source_down, search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=30))
+        o3d.geometry.estimate_normals(target_down, search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=30))
+
+        # source_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=30))
+        # target_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=30))
 
         result_icp = o3d.registration.registration_colored_icp(
             source_down, target_down, radius, current_transformation,
@@ -47,9 +50,9 @@ def color_icp(source, target, trans_init, down_sample=False):
                                                     max_iteration=iter))
         current_transformation = result_icp.transformation
 
-        print("scale %i transformation" % (scale+1))
+        print("scale %i transformation" % (scale))
         print(current_transformation)
-        draw_registration_result(source_down, target_down, current_transformation, True)
+        # draw_registration_result(source_down, target_down, current_transformation, True)
 
     return result_icp.transformation
 
@@ -117,7 +120,7 @@ def main():
 
     # o3d.visualization.draw_geometries([target])
 
-    for i, file_pth in enumerate(file_path): #enumerate(file_path[1:]):
+    for i, file_pth in enumerate(file_path[1:]):
         print("\n===== Aligning frame %i and %i =====" % (i, i+1))
         if args.input_type == 'rgbd':
             source = load_tum_rgbd(file_pth, depth_paths[i+1], calib)
@@ -134,8 +137,8 @@ def main():
         transformation = []
         if args.method == "color_icp":
             transformation = color_icp(source,target,trans_init)
-            print("transformation after color icp")
-            draw_registration_result(source, target, transformation, True)
+            # print("transformation after color icp")
+            # draw_registration_result(source, target, transformation, True)
         else:
             print("Unavailable ICP method, please input color_icp.")
             return -1

@@ -44,8 +44,6 @@ def load_tum_rgbd(color_pth, depth_pth, calib):
     pcd.points = o3d.utility.Vector3dVector(output_points) #numpy_points is your Nx3 cloud
     pcd.colors = o3d.utility.Vector3dVector(output_colors) #numpy_colors is an Nx3 matrix with the corresponding RGB colors
     
-    print("checking point cloud value\n", output_points, "\n\ncehcking point cloud color\n", output_colors)
-
     return pcd
     
 def load_file_name(folder_pth):
