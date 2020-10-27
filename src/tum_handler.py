@@ -22,10 +22,17 @@ def load_tum_rgbd(color_pth, depth_pth, calib):
     
     color_raw = o3d.io.read_image(color_pth)
     depth_raw = o3d.io.read_image(depth_pth)
-    rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(color_raw, depth_raw, depth_scale=scaling_factor, convert_rgb_to_intensity=False)
+    if o3d.__version__=='0.8.0.0':
+        rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(color_raw, depth_raw, depth_scale=scaling_factor, convert_rgb_to_intensity=False)
+    else:
+        # 0.7.0.0
+        rgbd_image = o3d.geometry.create_rgbd_image_from_color_and_depth(color_raw, depth_raw, depth_scale=scaling_factor, convert_rgb_to_intensity=False)
     tum_intrinsic = o3d.camera.PinholeCameraIntrinsic(o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault)
     tum_intrinsic.set_intrinsics(w, h, fx, fy, cx, cy)
-    pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, tum_intrinsic)
+    if o3d.__version__=='0.8.0.0':
+        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, tum_intrinsic)
+    else:
+        pcd = o3d.geometry.create_point_cloud_from_rgbd_image(rgbd_image, tum_intrinsic)
     # o3d.visualization.draw_geometries([pcd])
     
     return pcd
