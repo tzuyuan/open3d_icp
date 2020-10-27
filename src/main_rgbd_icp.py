@@ -5,6 +5,7 @@ import copy
 import glob
 import cv2
 import os
+from pyquaternion import Quaternion
 from tum_handler import *
 from utils import *
 
@@ -20,10 +21,10 @@ def parse_args():
 
 def color_icp(source, target, trans_init, down_sample=False):
 
-    voxel_radius = [0.04, 0.02, 0.01] # [0.75, 0.3, 0.05]
-    max_iter = [500, 300, 150] # [500, 300, 140]
+    voxel_radius = [0.04] #[0.04, 0.02, 0.01] # [0.75, 0.3, 0.05]
+    max_iter = [50] #[500, 300, 150] # [500, 300, 140]
     current_transformation = trans_init
-    for scale in range(3):
+    for scale in range(len(max_iter)):
         iter = max_iter[scale]
         radius = voxel_radius[scale]
         # print([iter, radius, scale])
@@ -109,7 +110,11 @@ def main():
         os.makedirs(output_file_folder)
     output_file_path = os.path.join(args.output, args.method, "icp_"+args.method+"_"+args.seq+".txt")
     transformation_file = open(output_file_path,"w") 
-    np.savetxt(transformation_file, accum_tf[:3, :].reshape(1,-1))
+    rotation_matrix = accum_tf[:3, :3]
+    quat = Quaternion(matrix=rotation_matrix)
+    tum_result_form = np.array([rgb_names[0], accum_tf[0,3], accum_tf[1,3], accum_tf[2,3], quat.x, quat.y, quat.z, quat.w])
+    print('tum_result', tum_result_form)
+    np.savetxt(transformation_file, tum_result_form.reshape(1,-1), fmt="%s %s %s %s %s %s %s %s")
     transformation_file.flush()
     
     # load the first frame
@@ -148,7 +153,10 @@ def main():
         print(accum_tf)
 
         # save file to the output file
-        np.savetxt(transformation_file, accum_tf[:3, :].reshape(1,-1))
+        rotation_matrix = accum_tf[:3, :3]
+        quat = Quaternion(matrix=rotation_matrix)
+        tum_result_form = np.array([rgb_names[i+1], accum_tf[0,3], accum_tf[1,3], accum_tf[2,3], quat.x, quat.y, quat.z, quat.w])
+        np.savetxt(transformation_file, tum_result_form.reshape(1,-1), fmt="%s %s %s %s %s %s %s %s")
         transformation_file.flush()
         # update source point cloud
         target = copy.deepcopy(source)
