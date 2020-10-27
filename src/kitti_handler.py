@@ -30,88 +30,38 @@ def load_kitti_from_pcd(lidar_path):
 
 def load_kitti_stereo(imgR_pth, imgL_pth, calib):
     """ load stereo images from kitti dataset and transform to point cloud """
+    # read left and right image
     imgL = cv2.imread(imgL_pth)
     imgR = cv2.imread(imgR_pth)
-    # imgL_gray = cv2.imread(imgL_pth,0)
-    # imgR_gray = cv2.imread(imgR_pth,0)
 
-    # # Set disparity parameters
-    # # https://docs.opencv.org/3.4/d2/d85/classcv_1_1StereoSGBM.html
-    # # https://stackoverflow.com/questions/45325795/point-cloud-from-kitti-stereo-images
+    # set calibration aprameters [calib = fx, fy, cx, cy, baseline]
+    fx = calib[0]
+    fy = calib[1]
+    cx = calib[2]
+    cy = calib[3]
+    baseline = calib[4]
 
-    # window_size = 9
-    # minDisparity = 1
-    # stereo = cv2.StereoSGBM_create(
-    #     blockSize=10,
-    #     numDisparities=64,
-    #     preFilterCap=10,
-    #     minDisparity=minDisparity,
-    #     P1=4 * 3 * window_size ** 2,
-    #     P2=32 * 3 * window_size ** 2
-    # )
+    # compute disparity map
+    disparity_map = getDisparity(imgL, imgR)
+    h, w = disparity_map.shape
 
-    # # Compute disparity map
-    # disparity_map = stereo.compute(imgL_gray, imgR_gray)
-    # disparity_map = disparity_map.astype(float)
+    # transform disparity to depth
+    mask_map = disparity_map > 0
+    depth_map = np.zeros_like(disparity_map)
+    disparith_to_depth = baseline * fx * np.ones_like(disparity_map)
 
-    # # Show disparity map before generating 3D cloud to verify that point cloud will be usable. 
-    # plt.imshow(disparity_map,'gray')
-    # plt.show()
-
-    # # mask_map = disparity_map > 0
-    # depth_map = np.zeros_like(disparity_map)
-    # disparith_to_depth = calib[4] * calib[0] * np.ones_like(disparity_map)
-
-    # with np.errstate(divide='ignore', invalid='ignore'):
-    #     depth_map = np.true_divide(disparith_to_depth, disparity_map)
-    #     depth_map[depth_map == np.inf] = 0
-    #     depth_map = np.nan_to_num(depth_map)
-
-    # depth_scale = 1000.0
-    # depth_map = depth_map / depth_scale
-
-    # # creating RGBD image
-    # depth_map = np.asarray(depth_map).astype(np.float32)
-    # depth_image = o3d.geometry.Image(depth_map)
-    # rgb_image = o3d.geometry.Image(imgL)
-
-    # rgbd_image = o3d.geometry.create_rgbd_image_from_color_and_depth(rgb_image, depth_image)
-
-    # intrinsic = o3d.camera.PinholeCameraIntrinsic(imgL_gray.shape[1], imgL_gray.shape[0], calib[0], calib[1], calib[2], calib[3])
-    # print('intrinsic\n', intrinsic.intrinsic_matrix)
-    # pcd = o3d.geometry.create_point_cloud_from_rgbd_image(rgbd_image, intrinsic)
-
-    disparity = getDisparity(imgL, imgR)
-
-    w = disparity.shape[0]
-    l = disparity.shape[1]
-
-    K = np.array([[calib[0], 0.0,      calib[2]], 
-                    [0.0,    calib[1], calib[3]], 
-                    [0.0,    0.0,          1.0]])
-
-    Q = np.array([[1, 0, 0, -l/2],
-                [0, 1, 0, -w/2],
-                [0, 0, 0, calib[0]],
-                [0, 0, -1/calib[4], 0]])
-
-    parallax_map = getParallaxMap(disparity)
-    points_3D = cv2.reprojectImageTo3D(disparity, Q)
-    # points_3D = reprojectImageTo3D(Q, parallax_map)
-
-    mask_map_zero = disparity > disparity.min()
-    # print('points_3D', points_3D)
-    mask_map_z = points_3D[:, :, 2] < 50
-    mask_map = mask_map_zero & mask_map_z
-
-    colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)
-
-    output_points = points_3D[mask_map]
-    output_colors = colors[mask_map]
-    
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(output_points) #numpy_points is your Nx3 cloud
-    pcd.colors = o3d.utility.Vector3dVector(output_colors) #numpy_colors is an Nx3 matrix with the corresponding RGB colors
+    with np.errstate(divide='ignore', invalid='ignore'):
+        depth_map = np.true_divide(disparith_to_depth, disparity_map)
+        depth_map[depth_map == np.inf] = 0
+        depth_map = np.nan_to_num(depth_map)
+    # depth_map = baseline * fx / disparity
+    depth_image = o3d.geometry.Image(depth_map)
+    color_image = o3d.io.read_image(imgL_pth)
+    rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(color_image, depth_image, depth_scale=1000, convert_rgb_to_intensity=False)
+    kitti_intrinsic = o3d.camera.PinholeCameraIntrinsic(o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault)
+    kitti_intrinsic.set_intrinsics(w, h, fx, fy, cx, cy)
+    pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, kitti_intrinsic)
+    # o3d.visualization.draw_geometries([pcd])    
 
     return pcd
 

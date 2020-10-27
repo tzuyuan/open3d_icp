@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument('--seq', type=str, help='kitti sequence', default='05')
     parser.add_argument('--kitti_folder', type=str, help='folder path of kitti dataset', default='/media/justin/LaCie/data/kitti/sequences/')
     parser.add_argument('--method', type=str, help='the method of point cloud registration', default='point_to_point')
-    parser.add_argument('--output', type=str, help='output file path', default='../results/')
+    parser.add_argument('--output', type=str, help='output file path', default='results/')
     args = parser.parse_args()
     return args
 
