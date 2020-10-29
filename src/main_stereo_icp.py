@@ -42,9 +42,10 @@ def main():
         calib = [float(i) for i in calib_str]
         print("calib", calib)
     elif args.input_type == 'pcd':
-        pcd_folder = os.path.join(args.kitti_folder, args.seq, "cvo_points_pcd")
+        pcd_folder = os.path.join(args.kitti_folder, args.seq, "stereo_full_pcd")
         print("Loading files from", pcd_folder)
         file_path = sorted(glob.glob(pcd_folder+"/*.pcd"))
+        print("file_path", file_path)
     else:
         print('Unavailable input type, please input stereo or pcd')
         return
@@ -88,7 +89,7 @@ def main():
         transformation = []
         if args.method == "color_icp":
             transformation = color_icp(source, target, trans_init)
-            draw_registration_result(source, target, transformation, True)
+            # draw_registration_result(source, target, transformation, True)
             evaluation = o3d.registration.evaluate_registration(source, target, threshold, trans_init)
             print("evaluation:", evaluation)
         else:

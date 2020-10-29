@@ -24,15 +24,15 @@ def load_kitti_lidar(lidar_path):
     pcd_with_normal = compute_normal(pcd)
     return pcd_with_normal
 
-def load_kitti_from_pcd(lidar_path):
+def load_kitti_from_pcd(pcd_path):
     """ load point cloud from pcd file """
-    return o3d.io.read_point_cloud(lidar_path)
+    pcd = o3d.io.read_point_cloud(pcd_path)
+    # o3d.io.write_point_cloud("kitti_point_cloud.pcd", pcd)
+    # o3d.visualization.draw_geometries([pcd])
+    return pcd
 
 def load_kitti_stereo(imgR_pth, imgL_pth, calib):
     """ load stereo images from kitti dataset and transform to point cloud """
-    # read left and right image
-    imgL = cv2.imread(imgL_pth)
-    imgR = cv2.imread(imgR_pth)
 
     # set calibration aprameters [calib = fx, fy, cx, cy, baseline]
     fx = calib[0]
@@ -41,33 +41,36 @@ def load_kitti_stereo(imgR_pth, imgL_pth, calib):
     cy = calib[3]
     baseline = calib[4]
 
-    # compute disparity map
-    disparity_map = getDisparity(imgL, imgR)
-    h, w = disparity_map.shape
+    imgL = cv2.imread(imgL_pth)
+    imgR = cv2.imread(imgR_pth)
 
-    # transform disparity to depth
-    mask_map = disparity_map > 0
-    depth_map = np.zeros_like(disparity_map)
-    disparith_to_depth = baseline * fx * np.ones_like(disparity_map)
+    disparity = getDisparity(imgL, imgR)
+    h, w = disparity.shape
 
-    with np.errstate(divide='ignore', invalid='ignore'):
-        depth_map = np.true_divide(disparith_to_depth, disparity_map)
-        depth_map[depth_map == np.inf] = 0
-        depth_map = np.nan_to_num(depth_map)
-    # depth_map = baseline * fx / disparity
-    depth_image = o3d.geometry.Image(depth_map)
-    color_image = o3d.io.read_image(imgL_pth)
-    if o3d.__version__=='0.8.0.0':
-        rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(color_image, depth_image, convert_rgb_to_intensity=False)
-    else:
-        rgbd_image = o3d.geometry.create_rgbd_image_from_color_and_depth(color_image, depth_image, convert_rgb_to_intensity=False)
-    kitti_intrinsic = o3d.camera.PinholeCameraIntrinsic(o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault)
-    kitti_intrinsic.set_intrinsics(w, h, fx, fy, cx, cy)
-    if o3d.__version__=='0.8.0.0':
-        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd_image, kitti_intrinsic)
-    else:
-        pcd = o3d.geometry.create_point_cloud_from_rgbd_image(rgbd_image, kitti_intrinsic) 
-    o3d.visualization.draw_geometries([pcd])    
+    # [x y z 1]^T = Q [u v d 1]^T
+    Q = np.array([[1, 0, 0, -cx],
+                  [0, 1, 0, -cy],
+                  [0, 0, 0, fx],
+                  [0, 0, 1/baseline, 0]])
+
+    points_3D = cv2.reprojectImageTo3D(disparity, Q)
+    colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)    
+    mask_map_zero = disparity > disparity.min()
+    mask_map_z1 = points_3D[:, :, 2] < 40
+    mask_map_z2 = points_3D[:, :, 2] > 0
+    mask_map = mask_map_zero & mask_map_z1 & mask_map_z2
+
+
+    output_points = points_3D[mask_map]
+    output_colors = colors[mask_map].astype(np.float64) / 255
+
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(output_points) #numpy_points is your Nx3 cloud
+    pcd.colors = o3d.utility.Vector3dVector(output_colors) #numpy_colors is an Nx3 matrix with the corresponding RGB colors
+
+    # o3d.io.write_point_cloud("kitti_point_cloud.pcd", pcd)
+    # o3d.visualization.draw_geometries([pcd])
 
     return pcd
 
@@ -91,43 +94,9 @@ def getDisparity(imgL, imgR):
         speckleRange = 32,
         preFilterCap=63
         )
-    disparity = stereo.compute(imgL, imgR).astype(np.float32) / 16.0
-    disparity = (disparity-min_disp)/num_disp
+    disparity = stereo.compute(imgL, imgR).astype(np.float32) / 16.0 #the map is a 16-bit signed single-channel image
+    # disparity = (disparity-min_disp)/num_disp
     return disparity
-
-
-def getParallaxMap(disparity):
-    parallax_map = []
-    x, y = disparity.shape
-    
-    for i in range(x):
-        for j in range(y):
-            parallax_map.append([j, i, disparity[i, j], 1])
-            
-    return np.array(parallax_map)
-
-
-def reprojectImageTo3D(Q, parallax_mat):
-    points_3D = Q @ parallax_mat.T
-    points_3D /= points_3D[3, :]
-    points_3D = points_3D[:3, :]
-    points_3D = points_3D.T
-    
-    output = np.zeros((370, 1226, 3))
-    i = 0
-    j = 0
-    
-    for p in range(points_3D.shape[0]):
-        output[i][j] = points_3D[p]
-        j += 1
-        
-        if j >= 1226:
-            j = 0
-            i += 1
-        
-    
-    print('points_3D shape after', output.shape)
-    return output
 
 
 def compute_normal(pcd):
