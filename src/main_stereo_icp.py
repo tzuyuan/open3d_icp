@@ -88,7 +88,7 @@ def main():
         transformation = []
         if args.method == "color_icp":
             transformation = color_icp(source, target, trans_init)
-            # draw_registration_result(source, target, transformation, True)
+            draw_registration_result(source, target, transformation, True)
             evaluation = o3d.registration.evaluate_registration(source, target, threshold, trans_init)
             print("evaluation:", evaluation)
         else:
