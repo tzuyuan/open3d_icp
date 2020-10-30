@@ -44,7 +44,11 @@ def load_kitti_stereo(imgR_pth, imgL_pth, calib):
     imgL = cv2.imread(imgL_pth)
     imgR = cv2.imread(imgR_pth)
 
-    disparity = getDisparity(imgL, imgR)
+    imgL_remove_sky = imgL[100:,:,:]
+    imgR_remove_sky = imgR[100:,:,:]
+
+    # disparity = getDisparity(imgL, imgR)
+    disparity = getDisparity(imgL_remove_sky, imgR_remove_sky)
     h, w = disparity.shape
 
     # [x y z 1]^T = Q [u v d 1]^T
@@ -54,7 +58,8 @@ def load_kitti_stereo(imgR_pth, imgL_pth, calib):
                   [0, 0, 1/baseline, 0]])
 
     points_3D = cv2.reprojectImageTo3D(disparity, Q)
-    colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)    
+    # colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)
+    colors = cv2.cvtColor(imgL_remove_sky, cv2.COLOR_BGR2RGB)
     mask_map_zero = disparity > disparity.min()
     mask_map_z1 = points_3D[:, :, 2] < 40
     mask_map_z2 = points_3D[:, :, 2] > 0
